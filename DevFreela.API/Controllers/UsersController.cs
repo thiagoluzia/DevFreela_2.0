@@ -1,8 +1,7 @@
-﻿using DevFreela.API.Entities;
-using DevFreela.API.Models;
-using DevFreela.API.Persistence;
+﻿using DevFreela.Application.Models;
+using DevFreela.Application.Services;
+using DevFreela.Core.Entities;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace DevFreela.API.Controllers
 {
@@ -10,29 +9,24 @@ namespace DevFreela.API.Controllers
     [ApiController]
     public class UsersController : ControllerBase
     {
-        private readonly DevFreelaDbContext _context;
+        private readonly IUSerService _service;
 
 
-        public UsersController(DevFreelaDbContext context)
+        public UsersController(IUSerService service)
         {
-            _context = context;
+            _service = service;
         }
 
 
         [HttpGet("{id}")]
         public IActionResult GetById(int id)
         {
-            var user = _context.Users
-                .Include(u => u.Skills)
-                    .ThenInclude(us => us.Skill)
-                .SingleOrDefault(u => u.Id == id);
+            var result = _service.GetById(id);
 
-            if (user is null)
-                return NotFound();
+            if (result is null)
+                return NotFound(result.Message);
 
-            var model = UserViewModel.FromEntity(user);
-
-            return Ok(model);
+            return Ok(result.Data);
         }
 
         // POST / API / Users
@@ -42,12 +36,12 @@ namespace DevFreela.API.Controllers
             if (model is null)
                 return BadRequest();
 
-            var user = new User(model.FullName, model.Email, model.BirthDate);
+            var result = _service.Post(model);
 
-            _context.Users.Add(user);
-            _context.SaveChanges();
+            if(!result.ISuccess)
+                return BadRequest(result.Message);
 
-            return NoContent();
+            return CreatedAtAction(nameof(GetById), new { id = result.Data }, model);
         }
 
         // PUT / API / Users / 1 / profile - picture
@@ -66,8 +60,8 @@ namespace DevFreela.API.Controllers
         {
             var userSkills = model.SkillsIds.Select(s => new UserSkill(model.Id, s)).ToList();
 
-            _context.UserSkills.AddRange(userSkills);
-            _context.SaveChanges();
+            //_context.UserSkills.AddRange(userSkills);
+            //_context.SaveChanges();
 
             return NoContent();
         }

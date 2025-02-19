@@ -10,11 +10,10 @@ namespace DevFreela.API.ExceptionHandler
             var details = new ProblemDetails
             {
                 Status = StatusCodes.Status500InternalServerError,
-                Title = "An error occurred"
+                Title = "Ocorreu um erro."
             }; 
 
             //Fazer o que preferir, logar o erro, enviar um email, etc
-
             httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
             await httpContext.Response.WriteAsJsonAsync(details, cancellationToken);
 

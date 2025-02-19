@@ -1,7 +1,6 @@
-﻿using DevFreela.API.Models;
-using DevFreela.API.Persistence;
+﻿using DevFreela.Application.Models;
+using DevFreela.Application.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace DevFreela.API.Controllers
@@ -11,12 +10,12 @@ namespace DevFreela.API.Controllers
     public class ProjectsController : ControllerBase
     {
         private readonly FreelanceTotalCostConfig _config;
-        private readonly DevFreelaDbContext _context;
+        private readonly IProjectService _service;
 
-        public ProjectsController(IOptions<FreelanceTotalCostConfig> options, DevFreelaDbContext context)
+        public ProjectsController(IOptions<FreelanceTotalCostConfig> options, IProjectService service)
         {
             _config = options.Value;
-            _context = context;
+            _service = service;
         }
 
 
@@ -24,41 +23,29 @@ namespace DevFreela.API.Controllers
         [HttpGet()]
         public IActionResult Get(string search = "", int page = 0, int size = 3)
         {
-            var projects = _context.Projects
-                .Include(p => p.Client)
-                .Include(p => p.Freelancer)
-                .Include(p => p.Comments)
-                .Where(p => !p.IsDeleted && (search == "" || p.Title.Contains(search)))
-                //.OrderByDescending(p => p.Id)
-                .Skip(page * size)
-                .Take(size)
-                .ToList();
-
-            var model = projects.Select(p => ProjectViewModel.FromEntity(p)).ToList();
-
-            return Ok(model);
+            var result = _service.GetAll(search, page, size);
+            return Ok(result);
         }
 
-        //// GET api/projects/1
-        //[HttpGet("{erro}")]
-        //public IActionResult GetByIdError()
-        //{
-        //    throw new Exception();
-        //}
+        #region Testantdo Exceptionhandler
+        // GET api/projects/1
+        [HttpGet("error/{erro}")]
+        public IActionResult GetByIdError()
+        {
+            throw new Exception();
+        }
+        #endregion
 
         // GET api/projects/1
         [HttpGet("{id}")]
         public IActionResult GetById(int id)
         {
-            var project = _context.Projects
-                .Include(p => p.Client)
-                .Include(p => p.Freelancer)
-                .Include(p => p.Comments)
-                .SingleOrDefault(p => p.Id == id);
+            var result = _service.GetById(id);
 
-            var model = ProjectViewModel.FromEntity(project);
+            if(!result.ISuccess)
+                return BadRequest(result.Message);
 
-            return Ok(model);
+            return Ok(result);
         }
 
         // POST api/projects
@@ -68,26 +55,22 @@ namespace DevFreela.API.Controllers
             if (model.TotalCost < _config.Minimum || model.TotalCost > _config.Maximum)
                 return BadRequest("Total cost must be between 1000 and 999999");
 
-            var project = model.ToEntity();
-            _context.Projects.Add(project);
-            _context.SaveChanges();
+            var result = _service.Insert(model);
 
-            return CreatedAtAction(nameof(GetById), new { id = 1 }, model);
+            if(!result.ISuccess)
+                return BadRequest(result.Message);
+
+            return CreatedAtAction(nameof(GetById), new { Id = result.Data }, model);
         }
 
         // PUT apt/projects/1
         [HttpPut("{id}")]
         public IActionResult Put(int id, UpdateProjectInputModels model)
         {
-            var project = _context.Projects.SingleOrDefault(p => p.Id == id);
+            var result = _service.Update(model);
 
-            if (project is null)
-                return NotFound();
-
-            project.Update(model.Title, model.Description, model.TotalCost);
-
-            _context.Projects.Update(project);
-            _context.SaveChanges();
+            if (!result.ISuccess)
+                return BadRequest(result.Message);
 
             return NoContent();
         }
@@ -96,14 +79,10 @@ namespace DevFreela.API.Controllers
         [HttpDelete("{id}")]
         public IActionResult Delete(int id)
         {
-            var project = _context.Projects.SingleOrDefault(where => where.Id == id);
+            var result = _service.Delete(id);
 
-            if (project is null)
-                return NotFound();
-
-            project.SetAsDeleted();
-            _context.Projects.Update(project);
-            _context.SaveChanges();
+            if (!result.ISuccess)
+                return BadRequest(result.Message);
 
             return NoContent();
         }
@@ -112,14 +91,10 @@ namespace DevFreela.API.Controllers
         [HttpPut("{id}/start")]
         public IActionResult Start(int id)
         {
-            var project = _context.Projects.SingleOrDefault(where => where.Id == id);
+            var result = _service.Start(id);
 
-            if (project is null)
-                return NotFound();
-
-            project.Start();
-            _context.Update(project);
-            _context.SaveChanges();
+            if (!result.ISuccess)
+                return BadRequest(result.Message);
 
             return NoContent();
         }
@@ -128,13 +103,10 @@ namespace DevFreela.API.Controllers
         [HttpPut("{id}/complete")]
         public IActionResult Complete(int id)
         {
-            var project = _context.Projects.SingleOrDefault(where => where.Id == id);
-            if (project is null)
-                return NotFound();
+            var result = _service.Complete(id);
 
-            project.Complete();
-            _context.Update(project);
-            _context.SaveChanges();
+            if (!result.ISuccess)
+                return BadRequest(result.Message);
 
             return NoContent();
         }
@@ -143,19 +115,12 @@ namespace DevFreela.API.Controllers
         [HttpPost("{id}/coments")]
         public IActionResult PostComents(int id, CreateProjectComentInputModel model)
         {
-            if (model is null)
-                return BadRequest();
+            var result =  _service.InsertComment(id, model);
 
-            var project = _context.Projects.SingleOrDefault(where => where.Id == id);
+            if (!result.ISuccess)
+                return BadRequest(result.Message);
 
-            if (project is null)
-                return NotFound();
-
-            var comment = model.ToEntity();
-            _context.ProjectComments.Add(comment);
-            _context.SaveChanges();
-
-            return Ok();
+            return NoContent();
         }
     }
 }

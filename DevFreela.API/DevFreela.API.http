@@ -1,6 +1,13 @@
 @DevFreela.API_HostAddress = http://localhost:5071
 
-GET {{DevFreela.API_HostAddress}}/weatherforecast/
+GET {{DevFreela.API_HostAddress}}/api/skills
 Accept: application/json
+###
+
+POST {{DevFreela.API_HostAddress}}/api/skills
+Content-Type: application/json
+{
+    "description": "C#"
+}
 
 ###
